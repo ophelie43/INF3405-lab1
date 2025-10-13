@@ -9,97 +9,81 @@ public class Client
 	private static DataInputStream dataInputStream = null;
 	
 	// Client application 
-	
-	public static void main(String[] args) throws Exception
-	{
-		Scanner myObj = new Scanner(System.in);
-		String serverAdress; // Read user Input
-		// Validation of IP address
-		do {
-			System.out.println("Enter IP address:");
-			serverAdress = myObj.nextLine();
-			if (!IPValidation(serverAdress)) {
-				System.out.println("Erreur: l'adresse IP est invalide.");	
-			}
-		} while (!IPValidation(serverAdress)); 
-		
-		
-		int serverPort;
-		// Validation of port
-		do {
-			System.out.println("Enter Port between 5000 and 5050:");
-			serverPort = Integer.parseInt(myObj.nextLine());
-			if (serverPort<5000 || serverPort > 5050) {
-				System.out.println("Erreur: la valeur du port doit se situer entre 5000 et 5050.");	
-			}
-		} while (serverPort<5000 || serverPort > 5050); 
+	public static void main(String[] args) {
+        Scanner myObj = new Scanner(System.in);
 
-		
-		// Creating a connection with the server
-		
-		socket = new Socket(serverAdress, serverPort);
-		System.out.format("Serveur lancé sur [%s:%d]", serverAdress, serverPort);
-		dataInputStream = new DataInputStream(socket.getInputStream());
-		dataOutputStream = new DataOutputStream(socket.getOutputStream());
-		String message = dataInputStream.readUTF();
-		System.out.println("Message reçu du serveur: " + message);
-		try {
-			sendFile("/Users/opheliesenechal/Desktop/Session 7/INF3405 - Réseaux informatiques/Labo 1/Exemple de code JAVA.pdf");
-			dataInputStream.close();
-			dataOutputStream.close();
-		}
-		catch(Exception e){
-			e.printStackTrace();
-			
-		}
-		
-//		while(true) {
-//			String cmd;
-//			String arg = null;
-//			System.out.print("> :");
-//			String input = myObj.nextLine();
-//			dataOutputStream.writeUTF(input);
-//			if (input.contains("<")) {
-//				String [] parts = input.split("<")	;		
-//				cmd = parts[0];
-//				arg = parts[1].replace(">", "");
-//			} else {
-//				cmd = input;
-//			}
-//			if (cmd.equals("cd")) {	
-//			}
-//			else if (cmd.equals("ls")) {
-//			}
-//			else if (cmd.equals("mkdir")) {
-//			}
-//			else if (cmd.equals("upload")) {
-//				sendFile("/Users/opheliesenechal/Desktop/Session 7/INF3405 - Réseaux informatiques/Labo 1/Exemple de code JAVA.pdf");
-//
-////				String serverResponse = dataInputStream.readUTF();
-////			    if (serverResponse.equals("READY_FOR_UPLOAD")) {
-////			        upload(arg);
-////			        String confirmation = dataInputStream.readUTF();
-////			        System.out.println("Serveur: " + confirmation);
-////			    } else {
-////			        System.out.println("Le serveur n'est pas prêt : " + serverResponse);
-////			    }
-//
-//			}
-//			else if (cmd.equals("upload")) {
-//				
-//			}
-//			
-//			else if (cmd.equals("delete")) {
-//				
-//			}
-//			else if (cmd.equals("exit")) {
-//				socket.close();
-//				
-//			}
-//		}
+        try {
+            // === 1️⃣ Connexion ===
+            System.out.println("Enter IP address:");
+            String serverAdress = myObj.nextLine();
+
+            System.out.println("Enter Port between 5000 and 5050:");
+            int serverPort = Integer.parseInt(myObj.nextLine());
+
+            socket = new Socket(serverAdress, serverPort);
+            System.out.format("Serveur lancé sur [%s:%d]\n", serverAdress, serverPort);
+
+            dataInputStream = new DataInputStream(socket.getInputStream());
+            dataOutputStream = new DataOutputStream(socket.getOutputStream());
+
+            String message = dataInputStream.readUTF();
+            System.out.println("Message reçu du serveur: " + message);
+
+            // === 2️⃣ Boucle de commande ===
+            boolean running = true;
+            while (running) {
+                System.out.print("> : ");
+                String input = myObj.nextLine();
+
+                String cmd, arg = null;
+                if (input.contains("<")) {
+                    String[] parts = input.split("<");
+                    cmd = parts[0];
+                    arg = parts[1].replace(">", "");
+                } else {
+                    cmd = input;
+                }
+
+                // On envoie toujours la commande au serveur
+                dataOutputStream.writeUTF(cmd);
+
+                switch (cmd) {
+                    case "upload":
+                        if (arg == null) {
+                            System.out.println("⚠️ Syntaxe: upload<chemin_du_fichier>");
+                        } else {
+                            sendFile(arg);
+                        }
+                        break;
+
+                    case "exit":
+                        running = false; // ✅ quitte proprement la boucle
+                        System.out.println("Déconnexion du serveur...");
+                        break;
+
+                    default:
+                        System.out.println("Commande inconnue ou non supportée pour le moment.");
+                        break;
+                }
+            }
+
+        } catch (Exception e) {
+            System.out.println("❌ Erreur client : " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            // === 3️⃣ Fermeture propre ===
+            try {
+                if (dataInputStream != null) dataInputStream.close();
+                if (dataOutputStream != null) dataOutputStream.close();
+                if (socket != null && !socket.isClosed()) socket.close();
+                System.out.println("✅ Client déconnecté avec succès.");
+            } catch (IOException e) {
+                System.out.println("Erreur lors de la fermeture : " + e.getMessage());
+            }
+        }
+    }
 
 
-		}
 		
 		
 		
@@ -191,39 +175,30 @@ public class Client
 		
 		
 	}
-	public static void sendFile(String path) throws Exception{
-		// Upload a file from the local directory of the client towards the stocking server
-		int bytes = 0;
-		// Open the File where located in your PC
-		File file = new File(path);
-		
-		FileInputStream fileInputStream = new FileInputStream(file);
-		// send the File to the Server
-		// send the name of the file
-		dataOutputStream.writeLong(file.length());
-		
-		
-		// Break file into chunks
-		byte[] buffer = new byte[4 * 1024];
-		while ((bytes = fileInputStream.read(buffer)) != -1) {
-			// Send the file to Server Socket
-		dataOutputStream.write(buffer, 0, bytes);
-			dataOutputStream.flush();
-		}
-		// close the file
-		fileInputStream.close();
-		}
-		
-			
-		
-	public static void download() {
-		//téléchargement d'un fichier, se trouvant dans le répertoire courant de 
-		//l'utilisateur au niveau du serveur de stockage, vers répertoire local du client
-	}
-	public static void delete() {
-		// Supprimer un fichier ou un dossier se trouvant dans le répertoire courant
-		// de l'utilisateur au niveau du serveur de stockage
-	}
+    private static void sendFile(String path)
+            throws Exception
+        {
+            int bytes = 0;
+            // Open the File where he located in your pc
+            File file = new File(path);
+            FileInputStream fileInputStream
+                = new FileInputStream(file);
+
+            // Here we send the File to Server
+            dataOutputStream.writeLong(file.length());
+            // Here we  break file into chunks
+            byte[] buffer = new byte[4 * 1024];
+            while ((bytes = fileInputStream.read(buffer))
+                   != -1) {
+              // Send the file to Server Socket  
+              dataOutputStream.write(buffer, 0, bytes);
+                dataOutputStream.flush();
+            }
+            // close the file here
+            fileInputStream.close();
+        }
+
+	
 
 
 }
