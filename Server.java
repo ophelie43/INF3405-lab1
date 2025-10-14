@@ -56,7 +56,7 @@ public class Server
 				//Creating a connection with the clients
 				try {
 					
-					
+					// keep listening until receives "exit" call
 					while(true)
 					{
 								// We wait for the next client

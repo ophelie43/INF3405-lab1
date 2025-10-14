@@ -7,18 +7,39 @@ public class Client
 	private static Socket socket;
 	private static DataOutputStream dataOutputStream = null;
 	private static DataInputStream dataInputStream = null;
+	private static FileOutputStream fileOutputStream;
+	private static BufferedOutputStream bufferedOutputStream;
+	private static final File currentDirectory = new File(System.getProperty("user.dir"));
+	
+
 	
 	// Client application 
 	public static void main(String[] args) {
+		
         Scanner myObj = new Scanner(System.in);
+		System.out.println("Enter IP adress :");
+		
+		String serverAdress; // Read user Input
+		// IP address validation
+		do {
+			System.out.println("Enter IP address:");
+			serverAdress = myObj.nextLine();
+			if (!IPValidation(serverAdress)) {
+				System.out.println("Erreur: l'adresse IP est invalide.");	
+			}
+		} while (!IPValidation(serverAdress)); 
 
+		int serverPort;
+		// Validation port
+		do {
+			System.out.println("Enter Port between 5000 and 5050:");
+			serverPort = Integer.parseInt(myObj.nextLine());
+			if (serverPort<5000 || serverPort > 5050) {
+				System.out.println("Erreur: la valeur du port doit se situer entre 5000 et 5050.");	
+			}
+		} while (serverPort<5000 || serverPort > 5050); 
         try {
-            // === 1️⃣ Connexion ===
-            System.out.println("Enter IP address:");
-            String serverAdress = myObj.nextLine();
-
-            System.out.println("Enter Port between 5000 and 5050:");
-            int serverPort = Integer.parseInt(myObj.nextLine());
+           
 
             socket = new Socket(serverAdress, serverPort);
             System.out.format("Serveur lancé sur [%s:%d]\n", serverAdress, serverPort);
@@ -29,7 +50,6 @@ public class Client
             String message = dataInputStream.readUTF();
             System.out.println("Message reçu du serveur: " + message);
 
-            // === 2️⃣ Boucle de commande ===
             boolean running = true;
             while (running) {
                 System.out.print("> : ");
@@ -45,7 +65,7 @@ public class Client
                 }
 
                 // On envoie toujours la commande au serveur
-                dataOutputStream.writeUTF(cmd);
+                dataOutputStream.writeUTF(input);
 
                 switch (cmd) {
                     case "upload":
@@ -55,9 +75,23 @@ public class Client
                             sendFile(arg);
                         }
                         break;
+                    case "mkdir":
+                    	System.out.println("Name of new folder: " + arg);
+                    	break;
+                    //case "cd":
+                    //case "ls":
+                    case "download":
+                    	if (arg == null)  {
+                    		System.out.println("⚠️ Syntaxe: upload<chemin_du_fichier>");
+                    	} else {
+                    		
+                    		receiveFile();
+                    	}
+                    	break;
+                    //case "delete":
 
                     case "exit":
-                        running = false; // ✅ quitte proprement la boucle
+                        running = false; 
                         System.out.println("Déconnexion du serveur...");
                         break;
 
@@ -71,7 +105,6 @@ public class Client
             System.out.println("❌ Erreur client : " + e.getMessage());
             e.printStackTrace();
         } finally {
-            // === 3️⃣ Fermeture propre ===
             try {
                 if (dataInputStream != null) dataInputStream.close();
                 if (dataOutputStream != null) dataOutputStream.close();
@@ -83,11 +116,6 @@ public class Client
         }
     }
 
-
-		
-		
-		
-		
 		
 		
 	public static boolean IPValidation(String address) {
@@ -150,37 +178,43 @@ public class Client
 		}
 		return result;
 	}
-	public static void cd() {
-		// se déplacer vers un répertoire enfant ou parent
-	}
-	public static void ls() {
-		//afficher tous les dossiers et fichiers dans le 
-		//répertoire courant de l'utilisateur au niveau du serveur
-		
-	}
-	public static void mkdir() {
-		// Création d'un dossier au niveau du serveur de stockage
-		
-	}
-	public static void upload(String path) {
-		try {
-			sendFile(path);
-			System.out.println("Fichier envoyé avec succès !");
+	private static void receiveFile()
+	        throws Exception
+	    {
+		String fileName = dataInputStream.readUTF();
+		long fileSize = dataInputStream.readLong();
+		File newFile = new File(currentDirectory, fileName);
+		System.out.println("📥 Téléchargement vers : " + newFile.getAbsolutePath());
 
-		}
-		catch (Exception e) {
-			System.out.println(e);
-		}
 		
-		
-		
-	}
+		try (FileOutputStream fos = new FileOutputStream(newFile);
+		         BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+
+		        byte[] buffer = new byte[4096];
+		        int bytesRead;
+		        long totalRead = 0;
+		        while (totalRead < fileSize && (bytesRead = dataInputStream.read(buffer)) != -1) {
+		            bos.write(buffer, 0, bytesRead);
+		            totalRead += bytesRead;
+		        }
+		        bos.flush();
+		    }
+
+		    System.out.println("✅ Fichier reçu : " + fileName + " (" + fileSize + " octets)");
+		  }
+	        
+	        // Here we received file
+	        	
     private static void sendFile(String path)
             throws Exception
         {
+    		File file = new File(path);
+    		dataOutputStream.writeUTF(file.getName());
+    		dataOutputStream.writeLong(file.length());
+    		dataOutputStream.flush();
             int bytes = 0;
             // Open the File where he located in your pc
-            File file = new File(path);
+            
             FileInputStream fileInputStream
                 = new FileInputStream(file);
 
